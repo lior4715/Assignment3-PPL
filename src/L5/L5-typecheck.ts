@@ -217,12 +217,31 @@ export const typeofLetrec = (exp: LetrecExp, tenv: TEnv): Result<TExp> => {
 //   (define (var : texp) val)
 //   If typeof(exp.val, tenv) = texp
 //   Then typeof(exp) = void
-export const typeofDefine = (exp: DefineExp, tenv: TEnv): Result<VoidTExp> =>
-    makeFailure("HW3 2.1 - Implement this function");
+export const typeofDefine = (exp: DefineExp, tenv: TEnv): Result<VoidTExp> => {
+    const valTE = typeofExp(exp.val, tenv);
+    const constraint = bind(valTE, (valTE: TExp) => checkEqualType(valTE, exp.var.texp, exp));
+    return bind(constraint, (_: true) => makeOk(makeVoidTExp()));
+};
+    
 
 // Purpose: compute the type of a program
 // Thread the TEnv through top-level expressions. A define extends the TEnv
 // for the expressions that follow it; the program type is the type of the
 // last expression.
 export const typeofProgram = (exp: Program, tenv: TEnv): Result<TExp> =>
-    makeFailure("HW3 2.2 - Implement this function");
+    typeofProgramExps(exp.exps, tenv);
+
+const typeofProgramExps = (exps: Exp[], tenv: TEnv): Result<TExp> => {
+    if (exps.length === 0) return makeFailure("Empty program");
+    const head = exps[0];
+    const tail = exps.slice(1);
+    if (tail.length === 0) return typeofExp(head, tenv);
+    if (isDefineExp(head)) {
+        const constraint = typeofDefine(head, tenv);
+        return bind(constraint, (_: VoidTExp) =>
+            typeofProgramExps(tail, makeExtendTEnv([head.var.var], [head.var.texp], tenv)));
+    }
+    return bind(typeofExp(head, tenv), (_: TExp) =>
+        typeofProgramExps(tail, tenv));
+};
+
